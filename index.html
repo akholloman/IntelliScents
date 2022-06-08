@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.css">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+  <title>Arduino Control</title>
+  <meta name="description" content="Control Arduino using Socket-io">
+  <meta name="author" content="HTIL">
+    <style>
+    .button {
+      border: none;
+      width: 100%;
+      color: white;
+      padding: 15px 32px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 32px;
+      margin: 4px 2px;
+      cursor: pointer;
+    }
+    
+    .button1 {background-color: #4CAF50;} /* Green */
+    .button2 {background-color: #008CBA;} /* Blue */
+    </style>
+</head>
+ <body>
+        <div class="center-content page-container">
+            <canvas></canvas>
+        
+          <script>
+            window.onload = () => {
+                detect();
+            };
+
+            async function detect() {
+            const canvas = document.querySelector("canvas");
+            const context = canvas.getContext("2d");
+            const faceDetector = new FaceDetector({ fastMode: true });
+            const mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" }
+            });
+
+            const video = document.createElement("video");
+            video.srcObject = mediaStream;
+            video.autoplay = true;
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            };
+
+            function render() {
+                faceDetector.detect(video).then((faces) => {
+                    if(faces.length == 0){
+                        console.log("No face was found, increasing fan speed...");
+                        //A way to check to see if the fan is already at that speed?
+                        //console.log(socket.speed) cleared....
+                        socket.sendServerMsgFromClient(1000) // speed up fan
+                        render();
+                    }
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+                    context.strokeStyle = "#FFFFFF";
+                    context.lineWidth = 1;
+                    faces.forEach((face) => {
+                    socket.sendServerMsgFromClient(100) //slow fan
+                    console.log("Found your face!!!!")
+                    console.log(faces)
+                    /* console.log(faces) */
+                    const { top, left, width, height } = face.boundingBox;
+                    context.beginPath();
+                    context.rect(left, top, width, height);
+                    context.stroke();
+                    });
+                }).catch(console.error);
+            }
+
+            (function renderLoop() {
+                requestAnimationFrame(renderLoop);
+                render();
+            })();
+            }
+          </script>
+      </div>
+
+    
+
+
+        <button class="button button1" onclick="socket.sendServerMsgFromClient(1000)">Fast</button>
+        <button class="button button1" onclick="socket.sendServerMsgFromClient(100)">Slow</button>
+        <button class="button button1" onclick="socket.sendServerMsgFromClient4()">Motor off</button>
+</body>
+<script>
+    var NodeSocket = function() {
+       this.socket = io();
+
+       this.sendServerMsgFromClient = function(speed) {
+           this.socket.emit("speed", {speed})
+       };
+
+       this.sendServerMsgFromClient2 = function() {
+           this.socket.emit("ledon", {})
+       };
+
+       this.sendServerMsgFromClient3 = function() {
+           this.socket.emit("ledoff", {})
+       };
+
+       this.sendServerMsgFromClient4 = function() {
+           this.socket.emit("stopMotor", {})
+       };
+
+       // Create listener
+       this.socket.on("exampleServerEvent", function(packet) {
+          console.log("Client: ", packet)
+       });
+   };
+
+   socket = new NodeSocket();
+
+ </script>
+ 
+</html> 
+
