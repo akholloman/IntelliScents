@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.css">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+    <script src="//unpkg.com/brain.js"></script>
+  <title>Adaptive Arduino Control</title>
+  <meta name="description" content="Control Arduino using Socket-io">
+  <meta name="author" content="HTIL">
+    <style>
+    .button {
+      border: none;
+      width: 100%;
+      color: white;
+      padding: 15px 32px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 32px;
+      margin: 4px 2px;
+      cursor: pointer;
+    }
+    
+    .button1 {background-color: #da2727;} /* Red */
+
+    </style>
+</head>
+ <body>
+        <div id="demo" class="center-content page-container">
+            <canvas></canvas>
+        
+          <script>
+            
+            //EMERGENCY STOP button flag
+            let shouldStop = false;
+            
+            window.onload = () => {
+                detect();
+            };
+
+            //EMERGENCY STOP func
+            async function turnMotorOff() {
+                shouldStop = true;
+                socket.sendServerMsgFromClient4()
+                console.log(shouldStop);
+            }
+            
+
+            async function detect() {
+            const canvas = document.querySelector("canvas");
+            const context = canvas.getContext("2d");
+            const faceDetector = new FaceDetector({ fastMode: true });
+            const mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" }
+            });
+
+            const video = document.createElement("video");
+            video.srcObject = mediaStream;
+            video.autoplay = true;
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            };
+
+            function render() {
+                faceDetector.detect(video).then((faces) => {
+
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+                    context.strokeStyle = "#FFFFFF";
+                    context.lineWidth = 1;
+                    
+                    faces.forEach((face) => {
+                        //Creating Neural Network
+                        const network = new brain.NeuralNetwork();
+                        
+                        // Training the Network with ??? input objects based on right eye presence
+                        network.train([
+                            {input:[352,194], output:{skrait:1}},
+                            {input:[341,181], output:{skrait:1}},
+                            {input:[308,216], output:{skrait:1}},
+                            {input:[315,214], output:{skrait:1}},
+                            {input:[322,214], output:{skrait:1}},
+                            {input:[283,214], output:{skrait:1}},
+                            {input:[318,228], output:{skrait:1}},
+                            {input:[331,217], output:{skrait:1}},
+                            {input:[317,159], output:{skrait:1}},
+                            {input:[311,154], output:{skrait:1}},
+                            {input:[0,0], output:{other:1}},
+                            {input:[1,1], output:{other:1}},
+                        ]);
+                        //Results based on right eye
+                        let result = network.run([face.landmarks[0].locations[0].x, face.landmarks[0].locations[0].y]); 
+
+                        //Fan logic based on right eye accuracy & neural network
+                       if (result.skrait > 0.89 ) {
+                            socket.sendServerMsgFromClient(450) //slow down fan
+                            console.log("Neural Results: Skrait")
+                         } 
+                         else {
+                            socket.sendServerMsgFromClient(1000) //speed up fan
+                            console.log("Neural Results: Other")
+                         }
+
+
+                    const { top, left, width, height } = face.boundingBox;
+                    context.beginPath();
+                    context.rect(left, top, width, height);
+                    context.stroke();
+                    });
+                }).catch(console.error);
+            }
+
+
+            (function renderLoop() {
+                if (!shouldStop){
+                    requestAnimationFrame(renderLoop);
+                    render();
+                }
+            })();
+            }
+
+
+          </script>
+
+       
+      </div>
+        <button class="button button1" onclick="turnMotorOff()">EMERGENCY STOP</button>
+
+</body>
+<script>
+    var NodeSocket = function() {
+       this.socket = io();
+
+       this.sendServerMsgFromClient = function(speed) {
+           this.socket.emit("speed", {speed})
+       };
+
+       this.sendServerMsgFromClient4 = function() {
+           this.socket.emit("stopMotor", {})
+       };
+
+       // Create listener
+       this.socket.on("exampleServerEvent", function(packet) {
+          console.log("Client: ", packet)
+       });
+   };
+
+   socket = new NodeSocket();
+
+ </script>
+ 
+</html> 
+
