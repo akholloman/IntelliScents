@@ -24,7 +24,6 @@
     }
     
     .button1 {background-color: #da2727;} /* Red */
-    .button2 {background-color: #28e522;} /* Green */
 
     </style>
 </head>
@@ -33,41 +32,145 @@
             <canvas></canvas>
         
           <script>
-            console.log("LOADING PAGE . . .")
-
+            
             //EMERGENCY STOP button flag
             let shouldStop = false;
-
-            //EMERGENCY STOP func
-            async function turnMotorOff() {
-                shouldStop = true;
-                socket.sendServerMsgFromClient4()
-                console.log("Motor Stopped");
-            }
 
             //Defining INTERVAL flag
             let motorOn;
 
+            let fanTimer = 3000
+            
+            window.onload = () => {
+                detect();
+            };
+
+            //EMERGENCY STOP func
+            async function turnMotorOff() {
+                clearInterval(motorOn);
+                shouldStop = true;
+                socket.sendServerMsgFromClient4()
+                console.log(shouldStop);
+            }
+            
             //Fan On Interval
             async function fanOn() {
-                console.log("START fan for 10 seconds")
+                socket.sendServerMsgFromClient(150) //speed up fan
+                console.log("START fan")
             }
 
-            //Start Fan Timer
-            async function startTimer() {
-                console.log("Starting Fan Intervals")
-                console.log("")
-                motorOn = setInterval(fanOn, 10000)
-                console.log("10 seconds")
+            async function detect() {
+            const canvas = document.querySelector("canvas");
+            const context = canvas.getContext("2d");
+            const faceDetector = new FaceDetector({ fastMode: true });
+            const mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" }
+            });
+
+            const video = document.createElement("video");
+            video.srcObject = mediaStream;
+            video.autoplay = true;
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            };
+
+
+
+            async function render() {
+                let detectionResults = await faceDetector.detect(video).then((faces) => {
+                    
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+                    context.strokeStyle = "#FFFFFF";
+                    context.lineWidth = 1;
+                    
+                    // Will cause app to break if detecting multiple faces
+                    let singleFace;
+                    let singleResult;
+                    faces.forEach((face) => {
+                        
+                        //Creating Neural Network
+                        const network = new brain.NeuralNetwork();
+                        
+                        // Training the Network with ??? input objects based on right eye presence
+                        network.train([
+                            {input:[352,194], output:{skrait:1}},
+                            {input:[341,181], output:{skrait:1}},
+                            {input:[308,216], output:{skrait:1}},
+                            {input:[315,214], output:{skrait:1}},
+                            {input:[322,214], output:{skrait:1}},
+                            {input:[283,214], output:{skrait:1}},
+                            {input:[318,228], output:{skrait:1}},
+                            {input:[331,217], output:{skrait:1}},
+                            {input:[317,159], output:{skrait:1}},
+                            {input:[311,154], output:{skrait:1}},
+                            {input:[0,0], output:{other:1}},
+                            {input:[1,1], output:{other:1}},
+                        ]);
+                        //Results based on right eye
+                        let result = network.run([face.landmarks[0].locations[0].x, face.landmarks[0].locations[0].y]); 
+                        console.log(face.landmarks[0].locations[0].x, face.landmarks[0].locations[0].y)
+                        //Fan logic based on right eye accuracy & neural network
+                       //console.log(result);
+                       if (result.skrait > 0.89 ) {
+                            //clearInterval(motorOn);
+                            //socket.sendServerMsgFromClient(0) ////slow fan down
+                            console.log("Neural Results: Focused")
+                         } 
+                         else if (faces.length == 0) {
+                           //motorOn = setInterval(fanOn, 150)
+                            console.log("Neural Results: Lost Focus")
+                         }
+                         else {
+                            //motorOn = setInterval(fanOn, 150)
+                            console.log("Neural Results: Lost Focus")
+                         }
+
+
+                    const { top, left, width, height } = face.boundingBox;
+                    context.beginPath();
+                    context.rect(left, top, width, height);
+                    context.stroke();
+
+                    singleFace = face;
+                    singleResult = result
+                    });
+
+                    return {singleResult, singleFace};
+
+                }).catch(console.error);
+
+
+                //console.log("singleFace ", detectionResults.singleFace)
+                //console.log("singleResult ", detectionResults)
+                let {singleFace} = detectionResults 
+                if (typeof singleFace === "undefined") {
+                    console.log("trigger")
+                    socket.sendServerMsgFromClient(150)
+                    setTimeout(()=> {
+                        socket.sendServerMsgFromClient(1)
+                    }, fanTimer)
+                }
             }
+
+
+            (function renderLoop() {
+                if (!shouldStop){
+                    requestAnimationFrame(renderLoop);
+                    render();
+                }
+            })();
+            }
+
 
           </script>
 
+       
       </div>
-        <button class="button button2" onclick="startTimer()">Start Study Session</button>
-        <button class="button button1" onclick="clearInterval(motorOn); turnMotorOff()">STOP SESSION</button> 
+        <button class="button button1" onclick="turnMotorOff()">EMERGENCY STOP</button>
+
 </body>
-    
 <script>
     var NodeSocket = function() {
        this.socket = io();
