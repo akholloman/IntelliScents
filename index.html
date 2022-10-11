@@ -31,8 +31,6 @@
         <div id="demo" class="center-content page-container">
             <canvas></canvas>
         
-            Please Enter Student ID: <input type="text" id="myText" value=" ">
-
         <script>
             
             //EMERGENCY STOP button flag
@@ -42,7 +40,7 @@
             let motorOn;
 
             //define the heading for each row of the data  
-            let csv = 'Data1\n';
+            let csv = 'Time, X, Y\n';
 
             //array data for csv
             let csvFileData = [];
@@ -80,12 +78,13 @@
                 hiddenElement.target = '_blank';  
     
                 //provide the name for the CSV file to be downloaded  
-                hiddenElement.download = 'Participant1.csv';  
+                hiddenElement.download = 'NSP20_1.csv';  
+               // hiddenElement.download = 'SP20_1.csv'; 
+                //hiddenElement.download = 'testerrr.csv'; 
                 hiddenElement.click();
-
-
             }
             
+
             //Fan On Interval
             async function fanOn() {
                 socket.sendServerMsgFromClient(150) //speed up fan
@@ -108,8 +107,6 @@
                 canvas.height = video.videoHeight;
             };
 
-
-
             async function render() {
                 let detectionResults = await faceDetector.detect(video).then((faces) => {
                     
@@ -126,7 +123,7 @@
                         //Creating Neural Network
                         const network = new brain.NeuralNetwork();
                         
-                        // Training the Network with ??? input objects based on right eye presence
+                        // Training the Network with input objects based on right eye presence
                         network.train([
                             {input:[352,194], output:{skrait:1}},
                             {input:[341,181], output:{skrait:1}},
@@ -144,6 +141,10 @@
 
                         //Results based on right eye
                         let result = network.run([face.landmarks[0].locations[0].x, face.landmarks[0].locations[0].y]); 
+                        
+                        
+                        
+                        
                         //console.log(face.landmarks[0].locations[0].x, face.landmarks[0].locations[0].y)
                        
                        //csvFileData.push(face.landmarks[0].locations[0].x, face.landmarks[0].locations[0].y);
@@ -161,12 +162,15 @@
                        console.log(result.other);
 
                         if (result.skrait > 0.89 ) {
+                            socket.sendServerMsgFromClient(1)
                             console.log("Neural Results: Focused")
                          } 
                          else if (faces.length == 0) {
+                            socket.sendServerMsgFromClient(200)
                             console.log("Neural Results: Lost Focus")
                          }
                          else {
+                            socket.sendServerMsgFromClient(200)
                             console.log("Neural Results: Lost Focus")
                          }
 
@@ -176,31 +180,30 @@
                     context.rect(left, top, width, height);
                     context.stroke();
 
+
+                //console.log("singleFace ", detectionResults.singleFace)
+                //console.log("singleResult ", detectionResults)
+
+
+
                     singleFace = face;
                     singleResult = result;
                     });
-
                     return {singleResult, singleFace};
 
                 }).catch(console.error);
 
-
-                //console.log("singleFace ", detectionResults.singleFace)
-                //console.log("singleResult ", detectionResults)
                 let {singleFace} = detectionResults;
                 if (typeof singleFace === "undefined") { 
                     time = Date.now();
                     csvFileData.push([time, 0, 0]);
-                    //sconsole.log("trigger")
-                    socket.sendServerMsgFromClient(300)
+                    console.log("trigger")
+                    socket.sendServerMsgFromClient(200)
                     setTimeout(()=> {
                         socket.sendServerMsgFromClient(1)
                     }, fanTimer)
                 }
-
             }
-
-
             (function renderLoop() {
                 if (!shouldStop){
                     requestAnimationFrame(renderLoop);
@@ -208,8 +211,6 @@
                 }
             })();
         }
-
-
           </script>
 
        

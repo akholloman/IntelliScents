@@ -1,10 +1,14 @@
 var five = require("johnny-five");
 const { Board, Motor } = require("johnny-five");
+
 var board = new five.Board({ port: "/dev/ttyACM2" });
 var button ;
 var button2;
 var speed = 100; 
 
+
+//{ port: "/dev/ttyACM2" });
+//cu.usbmodem14101
 board.on("ready", () => {
     /*
         Motor A
